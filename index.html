@@ -320,7 +320,7 @@
         .btn-start { background: #16a34a; }
         .btn-pause { background: #ea580c; }
         .btn-next { background: #2563eb; }
-        .btn-reset { background: #dc2626; }
+        .btn-finish { background: #7c3aed; }
 
         .hidden {
             display: none !important;
@@ -373,6 +373,115 @@
 
         .alert-box button:active {
             transform: scale(0.96);
+        }
+
+        .summary-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .summary-box {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 25px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+        }
+
+        .summary-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .summary-header h2 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .summary-header .subtitle {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .summary-section {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .summary-section h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+        }
+
+        .summary-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .summary-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .summary-highlight {
+            background: rgba(250,204,21,0.2);
+            border-left: 3px solid #facc15;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .summary-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .summary-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-new-rcp {
+            background: #16a34a;
+            color: white;
+        }
+
+        .btn-close-summary {
+            background: rgba(255,255,255,0.2);
+            color: white;
         }
 
         .audio-settings {
@@ -504,7 +613,7 @@
                 <button class="btn-next" onclick="app.nextPhase()" id="btnNextPhase">⏭️ Próxima fase</button>
             </div>
             <div class="controls-row">
-                <button class="btn-reset" onclick="app.reset()">🔄 Reiniciar</button>
+                <button class="btn-finish" onclick="app.finishRCP()">✅ Finalizar RCP</button>
             </div>
         </div>
     </div>
@@ -515,6 +624,69 @@
             <h3>Atenção!</h3>
             <p id="alertMessage"></p>
             <button onclick="app.closeAlert()">OK</button>
+        </div>
+    </div>
+
+    <!-- Resumo da RCP -->
+    <div class="summary-overlay" id="summaryOverlay">
+        <div class="summary-box">
+            <div class="summary-header">
+                <h2>📋 Resumo da RCP</h2>
+                <div class="subtitle">Relatório completo da ressuscitação</div>
+            </div>
+
+            <div class="summary-section">
+                <h3>🕐 Horários</h3>
+                <div class="summary-row">
+                    <span class="summary-label">Início da RCP:</span>
+                    <span class="summary-value" id="summaryStartTime">--:--</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Fim da RCP:</span>
+                    <span class="summary-value" id="summaryEndTime">--:--</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Duração total:</span>
+                    <span class="summary-value" id="summaryDuration">--:--</span>
+                </div>
+            </div>
+
+            <div class="summary-section">
+                <h3>📊 Estatísticas</h3>
+                <div class="summary-row">
+                    <span class="summary-label">Modo utilizado:</span>
+                    <span class="summary-value" id="summaryMode">--</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">💉 Doses de adrenalina:</span>
+                    <span class="summary-value" id="summaryAdrenaline">0</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">⚡ Choques aplicados:</span>
+                    <span class="summary-value" id="summaryShocks">0</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">🔄 Trocas de massagista:</span>
+                    <span class="summary-value" id="summaryMassageChanges">0</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Compressões totais:</span>
+                    <span class="summary-value" id="summaryCompressions">0</span>
+                </div>
+                <div class="summary-row" id="summaryCyclesRow">
+                    <span class="summary-label">Ciclos completos:</span>
+                    <span class="summary-value" id="summaryCycles">0</span>
+                </div>
+            </div>
+
+            <div class="summary-highlight" id="summaryOutcome">
+                <strong>Desfecho:</strong> <span id="summaryOutcomeText">RCP finalizada</span>
+            </div>
+
+            <div class="summary-buttons">
+                <button class="btn-new-rcp" onclick="app.startNewRCP()">🔄 Nova RCP</button>
+                <button class="btn-close-summary" onclick="app.closeSummary()">Fechar</button>
+            </div>
         </div>
     </div>
 
@@ -571,7 +743,7 @@
         const app = {
             // Estados principais
             isRunning: false,
-            isIntubated: false,  // NOVO: controla se é paciente intubado
+            isIntubated: false,
             totalTime: 0,
             phaseTime: 0,
             adrenalineTime: 0,
@@ -596,20 +768,21 @@
 
             timerHandle: null,
 
+            // Horários de início e fim
+            startTime: null,
+            endTime: null,
+
             phases: [
                 { name: 'Compressões (30x)', duration: 18 },
                 { name: 'Ventilações (2x)', duration: 5 }
             ],
 
-            // NOVA FUNÇÃO: Alterna entre intubado e não intubado
             setMode(intubated) {
                 this.isIntubated = intubated;
 
-                // Atualiza botões
                 document.getElementById('btnNotIntubated').classList.toggle('active', !intubated);
                 document.getElementById('btnIntubated').classList.toggle('active', intubated);
 
-                // Esconde/mostra botão "Próxima fase"
                 const btnNextPhase = document.getElementById('btnNextPhase');
                 if (intubated) {
                     btnNextPhase.style.display = 'none';
@@ -617,7 +790,6 @@
                     btnNextPhase.style.display = 'flex';
                 }
 
-                // Feedback de voz
                 if (this.isRunning) {
                     voiceSystem.speak(
                         intubated 
@@ -636,17 +808,22 @@
                 return String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
             },
 
+            formatClock(date) {
+                const h = String(date.getHours()).padStart(2, '0');
+                const m = String(date.getMinutes()).padStart(2, '0');
+                const s = String(date.getSeconds()).padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            },
+
             updateDisplay() {
                 document.getElementById('totalTime').textContent = this.formatTime(this.totalTime);
 
-                // Adrenalina
                 if (this.adrenalineActive) {
                     document.getElementById('adrenalineTime').textContent = this.formatTime(this.adrenalineTime);
                 } else {
                     document.getElementById('adrenalineTime').textContent = '--:--';
                 }
 
-                // Massagista
                 if (this.massageActive) {
                     document.getElementById('massageTime').textContent = this.formatTime(this.massageChangeTime);
                 } else {
@@ -655,7 +832,6 @@
 
                 document.getElementById('phaseTime').textContent = this.formatTime(this.phaseTime);
 
-                // AJUSTE: Mostra fase diferente se intubado
                 if (this.isIntubated) {
                     document.getElementById('phaseName').textContent = 'Compressões Contínuas';
                     document.getElementById('phaseInfo').textContent = 
@@ -670,7 +846,6 @@
                 const adrenalineCard = document.getElementById('adrenalineCard');
                 const massageCard = document.getElementById('massageCard');
 
-                // Alertas visuais
                 if (this.adrenalineActive && this.adrenalineTime >= 180) {
                     adrenalineCard.classList.add('alert');
                 } else {
@@ -703,7 +878,6 @@
                     this.massageChangeTime += 0.1;
                 }
 
-                // Alertas temporais
                 if (this.adrenalineActive) {
                     const adrenalSec = Math.floor(this.adrenalineTime);
                     if (adrenalSec === 180 && adrenalSec !== this.lastAdrenalineAlert) {
@@ -722,7 +896,6 @@
                     }
                 }
 
-                // AJUSTE: Só avança fase automaticamente se NÃO for intubado
                 if (!this.isIntubated) {
                     const currentPhase = this.phases[this.phaseIndex];
                     if (this.phaseTime >= currentPhase.duration) {
@@ -736,6 +909,9 @@
             start() {
                 if (this.isRunning) return;
                 this.isRunning = true;
+
+                this.startTime = new Date();
+
                 document.getElementById('statusText').textContent = 'RCP em andamento';
                 document.getElementById('startRow').classList.add('hidden');
                 document.getElementById('runningRow').classList.remove('hidden');
@@ -786,6 +962,9 @@
                 this.lastAdrenalineAlert = -999;
                 this.lastMassageAlert = -999;
 
+                this.startTime = null;
+                this.endTime = null;
+
                 document.getElementById('adrenalineCount').textContent = '0 doses';
                 document.getElementById('massageCount').textContent = '0 trocas';
                 document.getElementById('statusText').textContent = 'Pronto para iniciar';
@@ -802,7 +981,6 @@
             },
 
             nextPhase(auto = false) {
-                // Ignora se for intubado
                 if (this.isIntubated) return;
 
                 this.phaseIndex = (this.phaseIndex + 1) % this.phases.length;
@@ -904,6 +1082,44 @@
                         </div>
                     </div>
                 `).join('');
+            },
+
+            finishRCP() {
+                this.pause();
+                this.endTime = new Date();
+
+                document.getElementById('summaryStartTime').textContent = 
+                    this.startTime ? this.formatClock(this.startTime) : '--:--';
+
+                document.getElementById('summaryEndTime').textContent = 
+                    this.endTime ? this.formatClock(this.endTime) : '--:--';
+
+                document.getElementById('summaryDuration').textContent = this.formatTime(this.totalTime);
+
+                document.getElementById('summaryMode').textContent = 
+                    this.isIntubated ? 'Intubado (Contínuo)' : 'Não Intubado (30:2)';
+
+                document.getElementById('summaryAdrenaline').textContent = this.adrenalineCount;
+                document.getElementById('summaryShocks').textContent = this.shocks.length;
+                document.getElementById('summaryMassageChanges').textContent = this.massageChangeCount;
+                document.getElementById('summaryCompressions').textContent = this.compressionCount;
+                document.getElementById('summaryCycles').textContent = this.cycleCount;
+
+                const cyclesRow = document.getElementById('summaryCyclesRow');
+                cyclesRow.style.display = this.isIntubated ? 'none' : 'flex';
+
+                document.getElementById('summaryOverlay').style.display = 'flex';
+
+                voiceSystem.speak('RCP finalizada', 1.0, 1.0);
+            },
+
+            closeSummary() {
+                document.getElementById('summaryOverlay').style.display = 'none';
+            },
+
+            startNewRCP() {
+                this.closeSummary();
+                this.reset();
             },
 
             showAlert(message) {

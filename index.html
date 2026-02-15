@@ -70,6 +70,50 @@
             font-variant-numeric: tabular-nums;
         }
 
+        .mode-selector {
+            background: rgba(0,0,0,0.25);
+            border-radius: 15px;
+            padding: 12px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .mode-selector h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 4px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: rgba(255,255,255,0.25);
+            color: white;
+        }
+
+        .mode-btn:active {
+            transform: scale(0.96);
+        }
+
         .timers-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -89,6 +133,10 @@
         .timer-card.alert {
             border-color: #fbbf24;
             animation: pulse 1s infinite;
+        }
+
+        .timer-card.inactive {
+            opacity: 0.6;
         }
 
         @keyframes pulse {
@@ -326,6 +374,46 @@
         .alert-box button:active {
             transform: scale(0.96);
         }
+
+        .audio-settings {
+            background: rgba(0,0,0,0.25);
+            border-radius: 15px;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 12px;
+        }
+
+        .audio-settings h4 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .audio-settings label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+        }
+
+        .audio-settings input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .audio-settings button {
+            margin-top: 8px;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 11px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -343,21 +431,44 @@
             <div class="time" id="totalTime">00:00</div>
         </div>
 
+        <!-- Seletor de Modo: Intubado / Não Intubado -->
+        <div class="mode-selector">
+            <h3>🫁 Via Aérea</h3>
+            <div class="mode-buttons">
+                <button class="mode-btn active" id="btnNotIntubated" onclick="app.setMode(false)">
+                    Não Intubado (30:2)
+                </button>
+                <button class="mode-btn" id="btnIntubated" onclick="app.setMode(true)">
+                    Intubado (Contínuo)
+                </button>
+            </div>
+        </div>
+
         <!-- Timers de adrenalina e troca -->
         <div class="timers-grid">
-            <div class="timer-card" id="adrenalineCard">
+            <div class="timer-card inactive" id="adrenalineCard">
                 <div class="timer-title">💉 Adrenalina</div>
-                <div class="timer-time" id="adrenalineTime">00:00</div>
+                <div class="timer-time" id="adrenalineTime">--:--</div>
                 <div class="timer-subtitle" id="adrenalineCount">0 doses</div>
-                <button onclick="app.registerAdrenaline()">Registrar dose</button>
+                <button onclick="app.registerAdrenaline()">Aplicar 1ª dose</button>
             </div>
 
-            <div class="timer-card" id="massageCard">
+            <div class="timer-card inactive" id="massageCard">
                 <div class="timer-title">🔄 Troca de massagista</div>
-                <div class="timer-time" id="massageTime">00:00</div>
+                <div class="timer-time" id="massageTime">--:--</div>
                 <div class="timer-subtitle" id="massageCount">0 trocas</div>
-                <button onclick="app.changeMassager()">Registrar troca</button>
+                <button onclick="app.changeMassager()">Registrar 1ª troca</button>
             </div>
+        </div>
+
+        <!-- Configurações de áudio -->
+        <div class="audio-settings">
+            <h4>🔊 Configurações de Áudio</h4>
+            <label>
+                <input type="checkbox" id="audioEnabled" checked onchange="app.toggleAudio()">
+                <span>Ativar comandos de voz</span>
+            </label>
+            <button onclick="app.testVoice()">Testar voz</button>
         </div>
 
         <!-- Fase atual -->
@@ -390,7 +501,7 @@
             </div>
             <div class="controls-row hidden" id="runningRow">
                 <button class="btn-pause" onclick="app.pause()">⏸️ Pausar</button>
-                <button class="btn-next" onclick="app.nextPhase()">⏭️ Próxima fase</button>
+                <button class="btn-next" onclick="app.nextPhase()" id="btnNextPhase">⏭️ Próxima fase</button>
             </div>
             <div class="controls-row">
                 <button class="btn-reset" onclick="app.reset()">🔄 Reiniciar</button>
@@ -408,26 +519,73 @@
     </div>
 
     <script>
-        // Timer de tela ativa – simples (não dependemos de wakeLock aqui)
-        function preventScreenSleep() {
-            // Truque leve: tocar um áudio silencioso de tempos em tempos poderia ser usado,
-            // mas para evitar complicações, aqui não fazemos nada agressivo.
-            // Se precisar, depois ajustamos.
-        }
+        // Sistema de síntese de voz
+        const voiceSystem = {
+            enabled: true,
+            synth: window.speechSynthesis,
+            voice: null,
+
+            init() {
+                if (!this.synth) {
+                    console.log('Síntese de voz não disponível');
+                    return;
+                }
+
+                const loadVoices = () => {
+                    const voices = this.synth.getVoices();
+                    this.voice = voices.find(v => v.lang === 'pt-BR') || 
+                                 voices.find(v => v.lang.startsWith('pt')) ||
+                                 voices[0];
+                };
+
+                loadVoices();
+                if (this.synth.onvoiceschanged !== undefined) {
+                    this.synth.onvoiceschanged = loadVoices;
+                }
+            },
+
+            speak(text, rate = 1.0, pitch = 1.0) {
+                if (!this.enabled || !this.synth) return;
+
+                this.synth.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'pt-BR';
+                utterance.rate = rate;
+                utterance.pitch = pitch;
+                utterance.volume = 1.0;
+
+                if (this.voice) {
+                    utterance.voice = this.voice;
+                }
+
+                this.synth.speak(utterance);
+            },
+
+            toggle() {
+                this.enabled = !this.enabled;
+                return this.enabled;
+            }
+        };
 
         const app = {
             // Estados principais
             isRunning: false,
-            totalTime: 0,              // segundos (com decimais)
-            phaseTime: 0,              // segundos (com decimais)
-            adrenalineTime: 0,         // segundos
-            massageChangeTime: 0,      // segundos
+            isIntubated: false,  // NOVO: controla se é paciente intubado
+            totalTime: 0,
+            phaseTime: 0,
+            adrenalineTime: 0,
+            massageChangeTime: 0,
+
+            // Controle de ativação dos timers
+            adrenalineActive: false,
+            massageActive: false,
 
             // Contadores
             adrenalineCount: 0,
             massageChangeCount: 0,
             shocks: [],
-            lastShockTime: 0,          // segundos
+            lastShockTime: 0,
 
             cycleCount: 0,
             compressionCount: 0,
@@ -439,9 +597,37 @@
             timerHandle: null,
 
             phases: [
-                { name: 'Compressões (30x)', duration: 18 }, // aprox. tempo de 30 compressões
+                { name: 'Compressões (30x)', duration: 18 },
                 { name: 'Ventilações (2x)', duration: 5 }
             ],
+
+            // NOVA FUNÇÃO: Alterna entre intubado e não intubado
+            setMode(intubated) {
+                this.isIntubated = intubated;
+
+                // Atualiza botões
+                document.getElementById('btnNotIntubated').classList.toggle('active', !intubated);
+                document.getElementById('btnIntubated').classList.toggle('active', intubated);
+
+                // Esconde/mostra botão "Próxima fase"
+                const btnNextPhase = document.getElementById('btnNextPhase');
+                if (intubated) {
+                    btnNextPhase.style.display = 'none';
+                } else {
+                    btnNextPhase.style.display = 'flex';
+                }
+
+                // Feedback de voz
+                if (this.isRunning) {
+                    voiceSystem.speak(
+                        intubated 
+                            ? 'Modo intubado: compressões contínuas' 
+                            : 'Modo padrão: ciclos 30 compressões e 2 ventilações'
+                    );
+                }
+
+                this.updateDisplay();
+            },
 
             formatTime(sec) {
                 const s = Math.floor(sec);
@@ -452,62 +638,95 @@
 
             updateDisplay() {
                 document.getElementById('totalTime').textContent = this.formatTime(this.totalTime);
-                document.getElementById('adrenalineTime').textContent = this.formatTime(this.adrenalineTime);
-                document.getElementById('massageTime').textContent = this.formatTime(this.massageChangeTime);
+
+                // Adrenalina
+                if (this.adrenalineActive) {
+                    document.getElementById('adrenalineTime').textContent = this.formatTime(this.adrenalineTime);
+                } else {
+                    document.getElementById('adrenalineTime').textContent = '--:--';
+                }
+
+                // Massagista
+                if (this.massageActive) {
+                    document.getElementById('massageTime').textContent = this.formatTime(this.massageChangeTime);
+                } else {
+                    document.getElementById('massageTime').textContent = '--:--';
+                }
+
                 document.getElementById('phaseTime').textContent = this.formatTime(this.phaseTime);
 
-                const phase = this.phases[this.phaseIndex];
-                document.getElementById('phaseName').textContent = phase.name;
-                document.getElementById('phaseInfo').textContent =
-                    `Ciclo ${this.cycleCount + 1} • ${this.compressionCount} compressões`;
+                // AJUSTE: Mostra fase diferente se intubado
+                if (this.isIntubated) {
+                    document.getElementById('phaseName').textContent = 'Compressões Contínuas';
+                    document.getElementById('phaseInfo').textContent = 
+                        `100/min • ${this.compressionCount} compressões`;
+                } else {
+                    const phase = this.phases[this.phaseIndex];
+                    document.getElementById('phaseName').textContent = phase.name;
+                    document.getElementById('phaseInfo').textContent =
+                        `Ciclo ${this.cycleCount + 1} • ${this.compressionCount} compressões`;
+                }
 
-                // Alertas visuais de cartão
                 const adrenalineCard = document.getElementById('adrenalineCard');
                 const massageCard = document.getElementById('massageCard');
 
-                if (this.adrenalineTime >= 180) {
+                // Alertas visuais
+                if (this.adrenalineActive && this.adrenalineTime >= 180) {
                     adrenalineCard.classList.add('alert');
                 } else {
                     adrenalineCard.classList.remove('alert');
                 }
 
-                if (this.massageChangeTime >= 120) {
+                if (this.massageActive && this.massageChangeTime >= 120) {
                     massageCard.classList.add('alert');
                 } else {
                     massageCard.classList.remove('alert');
+                }
+
+                if (this.adrenalineActive) {
+                    adrenalineCard.classList.remove('inactive');
+                }
+                if (this.massageActive) {
+                    massageCard.classList.remove('inactive');
                 }
             },
 
             tick() {
                 this.totalTime += 0.1;
                 this.phaseTime += 0.1;
-                this.adrenalineTime += 0.1;
-                this.massageChangeTime += 0.1;
+
+                if (this.adrenalineActive) {
+                    this.adrenalineTime += 0.1;
+                }
+
+                if (this.massageActive) {
+                    this.massageChangeTime += 0.1;
+                }
 
                 // Alertas temporais
-                const adrenalSec = Math.floor(this.adrenalineTime);
-                if (adrenalSec === 180 && adrenalSec !== this.lastAdrenalineAlert) {
-                    this.lastAdrenalineAlert = adrenalSec;
-                    this.showAlert('⚠️ ADRENALINA\n3 minutos desde a última dose');
+                if (this.adrenalineActive) {
+                    const adrenalSec = Math.floor(this.adrenalineTime);
+                    if (adrenalSec === 180 && adrenalSec !== this.lastAdrenalineAlert) {
+                        this.lastAdrenalineAlert = adrenalSec;
+                        voiceSystem.speak('Aplicar adrenalina', 0.9, 1.1);
+                        this.showAlert('⚠️ ADRENALINA\n3 minutos desde a última dose');
+                    }
                 }
 
-                const massageSec = Math.floor(this.massageChangeTime);
-                if (massageSec === 120 && massageSec !== this.lastMassageAlert) {
-                    this.lastMassageAlert = massageSec;
-                    this.showAlert('⚠️ TROCAR MASSAGISTA\n2 minutos de compressão contínua');
+                if (this.massageActive) {
+                    const massageSec = Math.floor(this.massageChangeTime);
+                    if (massageSec === 120 && massageSec !== this.lastMassageAlert) {
+                        this.lastMassageAlert = massageSec;
+                        voiceSystem.speak('Checar ritmo, trocar massagista', 0.9, 1.1);
+                        this.showAlert('⚠️ TROCAR MASSAGISTA\n2 minutos de compressão contínua');
+                    }
                 }
 
-                // Avançar fase automaticamente
-                const currentPhase = this.phases[this.phaseIndex];
-                if (this.phaseTime >= currentPhase.duration) {
-                    this.nextPhase(true); // true = avanço automático
-                }
-
-                // Simples "metrônomo" para compressões (fase 0)
-                if (this.phaseIndex === 0) {
-                    const tenths = Math.floor(this.phaseTime * 10);
-                    if (tenths % 6 === 0) { // ~0,6s
-                        // Aqui podemos tocar um som discreto se quiser.
+                // AJUSTE: Só avança fase automaticamente se NÃO for intubado
+                if (!this.isIntubated) {
+                    const currentPhase = this.phases[this.phaseIndex];
+                    if (this.phaseTime >= currentPhase.duration) {
+                        this.nextPhase(true);
                     }
                 }
 
@@ -525,7 +744,7 @@
                     this.timerHandle = setInterval(() => this.tick(), 100);
                 }
 
-                preventScreenSleep();
+                voiceSystem.speak('Iniciando RCP', 1.0, 1.0);
             },
 
             pause() {
@@ -540,6 +759,8 @@
                     clearInterval(this.timerHandle);
                     this.timerHandle = null;
                 }
+
+                voiceSystem.speak('RCP pausada', 1.0, 1.0);
             },
 
             reset() {
@@ -549,6 +770,9 @@
                 this.phaseTime = 0;
                 this.adrenalineTime = 0;
                 this.massageChangeTime = 0;
+
+                this.adrenalineActive = false;
+                this.massageActive = false;
 
                 this.adrenalineCount = 0;
                 this.massageChangeCount = 0;
@@ -566,12 +790,21 @@
                 document.getElementById('massageCount').textContent = '0 trocas';
                 document.getElementById('statusText').textContent = 'Pronto para iniciar';
 
+                const adrenalineCard = document.getElementById('adrenalineCard');
+                const massageCard = document.getElementById('massageCard');
+                adrenalineCard.classList.add('inactive');
+                massageCard.classList.add('inactive');
+                adrenalineCard.querySelector('button').textContent = 'Aplicar 1ª dose';
+                massageCard.querySelector('button').textContent = 'Registrar 1ª troca';
+
                 this.renderShocks();
                 this.updateDisplay();
             },
 
             nextPhase(auto = false) {
-                // Se acabamos de sair das ventilações e voltamos para compressões
+                // Ignora se for intubado
+                if (this.isIntubated) return;
+
                 this.phaseIndex = (this.phaseIndex + 1) % this.phases.length;
                 this.phaseTime = 0;
 
@@ -581,30 +814,52 @@
                 }
 
                 if (!auto) {
-                    this.showAlert(`Fase alterada para: ${this.phases[this.phaseIndex].name}`);
+                    const phaseName = this.phases[this.phaseIndex].name;
+                    voiceSystem.speak(phaseName, 1.0, 1.0);
+                    this.showAlert(`Fase alterada para: ${phaseName}`);
                 }
 
                 this.updateDisplay();
             },
 
             registerAdrenaline() {
+                if (!this.adrenalineActive) {
+                    this.adrenalineActive = true;
+                }
+
                 this.adrenalineCount++;
                 this.adrenalineTime = 0;
                 this.lastAdrenalineAlert = -999;
+
                 document.getElementById('adrenalineCount').textContent =
                     `${this.adrenalineCount} dose${this.adrenalineCount > 1 ? 's' : ''}`;
 
-                this.showAlert(`Adrenalina #${this.adrenalineCount} registrada\nPróxima dose em 3 minutos`);
+                document.querySelector('#adrenalineCard button').textContent = 'Registrar dose';
+
+                voiceSystem.speak('Adrenalina aplicada', 1.0, 1.0);
+                this.showAlert(`Adrenalina #${this.adrenalineCount} registrada\nTimer resetado - próxima dose em 3 minutos`);
+
+                this.updateDisplay();
             },
 
             changeMassager() {
+                if (!this.massageActive) {
+                    this.massageActive = true;
+                }
+
                 this.massageChangeCount++;
                 this.massageChangeTime = 0;
                 this.lastMassageAlert = -999;
+
                 document.getElementById('massageCount').textContent =
                     `${this.massageChangeCount} troca${this.massageChangeCount > 1 ? 's' : ''}`;
 
-                this.showAlert(`Troca de massagista #${this.massageChangeCount}\nPróxima troca em 2 minutos`);
+                document.querySelector('#massageCard button').textContent = 'Registrar troca';
+
+                voiceSystem.speak('Massagista trocado', 1.0, 1.0);
+                this.showAlert(`Troca de massagista #${this.massageChangeCount}\nTimer resetado - próxima troca em 2 minutos`);
+
+                this.updateDisplay();
             },
 
             registerShock() {
@@ -622,6 +877,7 @@
                 this.lastShockTime = this.totalTime;
                 this.renderShocks();
 
+                voiceSystem.speak('Choque aplicado', 1.0, 1.0);
                 this.showAlert(
                     `Choque #${shock.number} registrado\nTempo: ${this.formatTime(shock.timestamp)}`
                 );
@@ -657,11 +913,21 @@
 
             closeAlert() {
                 document.getElementById('alertOverlay').style.display = 'none';
+            },
+
+            toggleAudio() {
+                const enabled = voiceSystem.toggle();
+                document.getElementById('audioEnabled').checked = enabled;
+            },
+
+            testVoice() {
+                voiceSystem.speak('Teste de voz. Checar ritmo, trocar massagista. Aplicar adrenalina.', 0.9, 1.0);
             }
         };
 
-        // Inicializa display ao carregar
+        // Inicializa
         window.addEventListener('load', () => {
+            voiceSystem.init();
             app.updateDisplay();
             app.renderShocks();
         });
